@@ -1,151 +1,302 @@
 import streamlit as st
 import pandas as pd
-import math
-from pathlib import Path
+import numpy as np
+import random
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+# Load the data
+@st.cache
+def load_data():
+    return pd.read_excel("四字熟語ガチャ.xlsx")
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+words_df = load_data()
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+def decide():
+    if st.button('クイズを解く！'):
+        rarity_probs = {
+            'N': 0.4,
+            'R': 0.3,
+            'SR': 0.2,       
+            'SSR': 0.1
+        }
+        chosen_rarity = np.random.choice(list(rarity_probs.keys()), p=list(rarity_probs.values()))
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+        subset_df = words_df[words_df['レア度'] == chosen_rarity]
+        selected_word = subset_df.sample().iloc[0]
+    
+        # セッションステートに選択された単語を保存
+        st.session_state.selected_word = selected_word
+        st.session_state.display_meaning = False
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+        st.session_state.ran_list = None
+        st.session_state.ans = []
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+def yojiyoji():
+    yoji_list = list(st.session_state.selected_word['単語'])
+    st.session_state.yoji_list = yoji_list
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+def ranran():
+    yojiyoji()
+    if st.session_state.ran_list == None:
+        ran_list = random.sample(st.session_state.yoji_list,len(st.session_state.yoji_list))
+        st.session_state.ran_list = ran_list
+    else:
+        pass
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+def show_game():
+    st.title('四字熟語カテゴリークイズ')
+    st.write('四字熟語のカテゴリーについて、最も正しいと思うものを選んでください。なお、これはChatGPTが分類したものです。')
 
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[gdp_df['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[gdp_df['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
+    def judge(kategori):
+        if st.session_state.selected_word['分類']==kategori:
+            return True
         else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
+            return False
+     
+    decide()
 
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+    if 'selected_word' in st.session_state:
+        st.header(f"単語名: {st.session_state.selected_word['単語']}")
+        st.subheader(f"読み方：{st.session_state.selected_word['読み方']}")
+
+        if st.button('文学・哲学的なテーマ性'):
+            if judge('文学・哲学的なテーマ性'):
+                st.success('正解です。おめでとうございます！正確な意味も確認しましょう。')
+                st.success(f"この熟語の意味: {st.session_state.selected_word['意味']}")
+            else:
+                st.error('残念、不正解です。')
+                st.error(f"正解は「{st.session_state.selected_word['分類']}」")
+                st.error('正しい答えを確認し、この熟語をマスターしましょう！')
+                st.error(f"この熟語の意味: {st.session_state.selected_word['意味']}")
+
+
+        elif st.button('行動・精神的な特性'):
+            if judge('行動・精神的な特性'):
+                st.success('正解です。おめでとうございます！正確な意味も確認しましょう。')
+                st.success(f"この熟語の意味: {st.session_state.selected_word['意味']}")
+            else:
+                st.error('残念、不正解です。')
+                st.error(f"正解は「{st.session_state.selected_word['分類']}」")
+                st.error('正しい答えを確認し、この熟語をマスターしましょう！')
+                st.error(f"この熟語の意味: {st.session_state.selected_word['意味']}")
+
+        elif st.button('自然・現象に関連するもの'):
+            if judge('自然・現象に関連するもの'):
+                st.success('正解です。おめでとうございます！正確な意味も確認しましょう。')
+                st.success(f"この熟語の意味: {st.session_state.selected_word['意味']}")
+            else:
+                st.error('残念、不正解です。')
+                st.error(f"正解は「{st.session_state.selected_word['分類']}」")
+                st.error('正しい答えを確認し、この熟語をマスターしましょう！')
+                st.error(f"この熟語の意味: {st.session_state.selected_word['意味']}")
+
+def show_pro():
+    st.title('カテゴリー別一覧表')
+
+    tab = st.radio('どのカテゴリーを見ますか？',['文学・哲学的なテーマ性','行動・精神的な特性','自然・現象に関連するもの'])
+
+    filtered_df = words_df[words_df['分類'] == tab]
+
+    for index,row in filtered_df.iterrows():
+        st.subheader(f"単語名:{row['単語']}")
+        st.write(f"読み方:{row['読み方']}")
+        st.write(f"意味:{row['意味']}")
+
+def game_yomi():
+    st.title('読み方クイズ')
+    st.write('表示される四字熟語の読みを答えてください。ヒントとして意味を確認することができます。また、全角ひらがなでの解答お願いします。')
+
+    decide()
+
+    if 'selected_word' in st.session_state:
+        st.subheader(f"「{st.session_state.selected_word['単語']}」は、何と読む？")
+        answer = st.text_input('読み方を入力してください:')
+
+    if st.button('解答する') and 'selected_word' in st.session_state:
+        if answer == st.session_state.selected_word['読み方']:
+                st.success('おめでとうございます、正解です！')
+        else:
+            st.error('違います。答えを確認してください。')
+            st.error(f"答え:{st.session_state.selected_word['読み方']}")
+    if st.button('ヒントを見る') and 'selected_word' in st.session_state:
+        st.write(f"この単語の意味:{st.session_state.selected_word['意味']}")
+
+def menu():
+    st.title('四字熟語クイズ')
+    st.write('四字熟語に関するクイズをつくりました。好きなクイズを選んで遊んでください！')
+
+def ans_pro():
+    st.title('熟語クイズ')
+    st.write('表示された意味となる四字熟語を漢字四字で答えてください。表記ゆれにより不正解とされる場合もあるため、不正解と出たら他の表記法で試してみてください。')
+    
+    decide()
+
+    if 'selected_word' in st.session_state:
+        st.subheader(f"「{st.session_state.selected_word['意味']}」という意味の四字熟語を答えよ。")
+        st.session_state.yoji = st.text_input('これは何という四字熟語でしょう？:')
+
+    if st.button('解答する'):
+        if st.session_state.yoji == st.session_state.selected_word['単語']:
+                st.success('おめでとうございます、正解です！')
+        else:
+            st.error('違います。')
+
+    if st.button('答えを確認する'):
+        st.error(f"答え:{st.session_state.selected_word['単語']}")
+
+def ang_pro():
+    st.title('アナグラムクイズ')
+    st.write('今から表示される漢字四字を、意味の通りになるように順番にボタンをクリック(タップ)してください。')
+
+    decide()
+
+    if 'selected_word' in st.session_state:
+        yojiyoji()
+        ranran()
+
+        st.subheader(f"「{st.session_state.selected_word['意味']}」という意味の四字熟語を作れ。")
+
+        col1,col2,col3,col4,col5 = st.columns(5)
+    
+        if st.session_state.ran_list[0] == st.session_state.ran_list[1]:
+            with col1:
+                if st.button(st.session_state.ran_list[0]):
+                    st.session_state.ans.append(st.session_state.ran_list[0])
+            with col2:
+                if st.button(st.session_state.ran_list[1]+ ' '):
+                    st.session_state.ans.append(st.session_state.ran_list[1])
+            with col3:
+                if st.button(st.session_state.ran_list[2]):
+                    st.session_state.ans.append(st.session_state.ran_list[2])
+            with col4:
+                if st.button(st.session_state.ran_list[3]):
+                    st.session_state.ans.append(st.session_state.ran_list[3])
+            with col5:
+                if st.button('一字消去'):
+                    if 'ans' in st.session_state and st.session_state.ans:
+                        st.session_state.ans.pop()
+        elif st.session_state.ran_list[0] == st.session_state.ran_list[2]:
+            with col1:
+                if st.button(st.session_state.ran_list[0]):
+                    st.session_state.ans.append(st.session_state.ran_list[0])
+            with col2:
+                if st.button(st.session_state.ran_list[1]):
+                    st.session_state.ans.append(st.session_state.ran_list[1])
+            with col3:
+                if st.button(st.session_state.ran_list[2]+' '):
+                    st.session_state.ans.append(st.session_state.ran_list[2])
+            with col4:
+                if st.button(st.session_state.ran_list[3]):
+                    st.session_state.ans.append(st.session_state.ran_list[3])
+            with col5:
+                if st.button('一字消去'):
+                    if 'ans' in st.session_state and st.session_state.ans:
+                        st.session_state.ans.pop()
+        elif st.session_state.ran_list[0] == st.session_state.ran_list[3]:
+            with col1:
+                if st.button(st.session_state.ran_list[0]):
+                    st.session_state.ans.append(st.session_state.ran_list[0])
+            with col2:
+                if st.button(st.session_state.ran_list[1]):
+                    st.session_state.ans.append(st.session_state.ran_list[1])
+            with col3:
+                if st.button(st.session_state.ran_list[2]):
+                    st.session_state.ans.append(st.session_state.ran_list[2])
+            with col4:
+                if st.button(st.session_state.ran_list[3]+' '):
+                    st.session_state.ans.append(st.session_state.ran_list[3])
+            with col5:
+                if st.button('一字消去'):
+                    if 'ans' in st.session_state and st.session_state.ans:
+                       st.session_state.ans.pop()
+        elif st.session_state.ran_list[1] == st.session_state.ran_list[2]:
+            with col1:
+                if st.button(st.session_state.ran_list[0]):
+                    st.session_state.ans.append(st.session_state.ran_list[0])
+            with col2:
+                if st.button(st.session_state.ran_list[1]):
+                    st.session_state.ans.append(st.session_state.ran_list[1])
+            with col3:
+                if st.button(st.session_state.ran_list[2]+' '):
+                    st.session_state.ans.append(st.session_state.ran_list[2])
+            with col4:
+                if st.button(st.session_state.ran_list[3]):
+                    st.session_state.ans.append(st.session_state.ran_list[3])
+            with col5:
+                if st.button('一字消去'):
+                    if 'ans' in st.session_state and st.session_state.ans:
+                        st.session_state.ans.pop()
+        elif st.session_state.ran_list[1] == st.session_state.ran_list[3]:
+            with col1:
+                if st.button(st.session_state.ran_list[0]):
+                    st.session_state.ans.append(st.session_state.ran_list[0])
+            with col2:
+                if st.button(st.session_state.ran_list[1]):
+                    st.session_state.ans.append(st.session_state.ran_list[1])
+            with col3:
+                if st.button(st.session_state.ran_list[2]):
+                    st.session_state.ans.append(st.session_state.ran_list[2])
+            with col4:
+                if st.button(st.session_state.ran_list[3]+' '):
+                    st.session_state.ans.append(st.session_state.ran_list[3])
+            with col5:
+                if st.button('一字消去'):
+                    if 'ans' in st.session_state and st.session_state.ans:
+                        st.session_state.ans.pop()
+        elif st.session_state.ran_list[2] == st.session_state.ran_list[3]:
+            with col1:
+                if st.button(st.session_state.ran_list[0]):
+                    st.session_state.ans.append(st.session_state.ran_list[0])
+            with col2:
+                if st.button(st.session_state.ran_list[1]):
+                    st.session_state.ans.append(st.session_state.ran_list[1])
+            with col3:
+                if st.button(st.session_state.ran_list[2]):
+                    st.session_state.ans.append(st.session_state.ran_list[2])
+            with col4:
+                if st.button(st.session_state.ran_list[3]+' '):
+                    st.session_state.ans.append(st.session_state.ran_list[3])
+            with col5:
+                if st.button('一字消去'):
+                    if 'ans' in st.session_state and st.session_state.ans:
+                        st.session_state.ans.pop()
+        else:
+            with col1:
+                if st.button(st.session_state.ran_list[0]):
+                    st.session_state.ans.append(st.session_state.ran_list[0])
+            with col2:
+                if st.button(st.session_state.ran_list[1]):
+                    st.session_state.ans.append(st.session_state.ran_list[1])
+            with col3:
+                if st.button(st.session_state.ran_list[2]):
+                    st.session_state.ans.append(st.session_state.ran_list[2])
+            with col4:
+                if st.button(st.session_state.ran_list[3]):
+                    st.session_state.ans.append(st.session_state.ran_list[3])
+            with col5:
+                if st.button('一字消去'):
+                    if 'ans' in st.session_state and st.session_state.ans:
+                        st.session_state.ans.pop()
+    
+        if 'ans' in st.session_state:
+            yoyo = ''.join(st.session_state.ans)
+            st.subheader('あなたの解答:'+yoyo)
+        
+        if st.session_state.ans == st.session_state.yoji_list:
+            st.success('おめでとうございます、正解です！')
+        elif st.session_state.ans != st.session_state.yoji_list and len(st.session_state.ans) >= 4:
+            st.error('違います。')
+
+sidetab = st.sidebar.radio('選択してください',['メニュー','熟語クイズ','読み方クイズ','カテゴリークイズ','アナグラムクイズ','カテゴリー別一覧'])
+
+if sidetab == 'カテゴリークイズ':
+    show_game()
+elif sidetab == '読み方クイズ':
+    game_yomi()
+elif sidetab == 'カテゴリー別一覧':
+    show_pro()
+elif sidetab == 'メニュー':
+    menu()
+elif sidetab == '熟語クイズ':
+    ans_pro()
+elif sidetab == 'アナグラムクイズ':
+    ang_pro()

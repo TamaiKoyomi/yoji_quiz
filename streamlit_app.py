@@ -2,8 +2,8 @@ import streamlit as st
 
 st.title('算出')
 
-ramuda_ori = st.number_imput('とうちゃくりつ')
-myu_ori = st.number_imput('さーびすりつ')
+ramuda_ori = st.number_input('とうちゃくりつ')
+myu_ori = st.number_input('さーびすりつ')
 
 ramuda = 1 / ramuda_ori
 myu = 1 / myu_ori

@@ -16,6 +16,10 @@ if ramuda_ori != 0 and myu_ori != 0:
     hidari = ro / bo
     migi = 1 / myu
 
+    st.write('ro')
+    st.subheader(ro)
+
+    st.write('bunnnoiti')
     st.subheader(hidari)
 
     answer = hidari * migi

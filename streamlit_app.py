@@ -24,7 +24,7 @@ if ramuda_ori != 0 and myu_ori != 0:
 
     answer = hidari * migi
 
-    if myu_ori > ramuda_ori:
+    if myu > ramuda:
         st.title(answer)
     else:
         st.title('はっさん')

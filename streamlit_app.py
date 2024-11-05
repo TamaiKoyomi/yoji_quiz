@@ -9,16 +9,16 @@ if ramuda_ori != 0 and myu_ori != 0:
     ramuda = 1 / ramuda_ori
     myu = 1 / myu_ori
 
-ro = ramuda / myu
+    ro = ramuda / myu
 
-bo = 1 - ro
+    bo = 1 - ro
 
-hidari = ro / bo
-migi = 1 / myu
+    hidari = ro / bo
+    migi = 1 / myu
 
-answer = hidari * migi
+    answer = hidari * migi
 
-if myu > ramuda:
-    st.title(answer)
-else:
-    st.title('はっさん')
+    if myu > ramuda:
+        st.title(answer)
+    else:
+        st.title('はっさん')
